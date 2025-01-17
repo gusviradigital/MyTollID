@@ -38,18 +38,31 @@ class MifareReader : CardReader {
         try {
             mifare.connect()
             
-            // Coba baca sektor 1 blok 4 (lokasi umum untuk saldo)
-            val sector = 1
-            val block = 4
+            // Key untuk E-Money
+            val keyA = byteArrayOf(
+                0xA0.toByte(), 0xA1.toByte(), 0xA2.toByte(),
+                0xA3.toByte(), 0xA4.toByte(), 0xA5.toByte()
+            )
             
-            if (mifare.authenticateSectorWithKeyA(sector, MifareClassic.KEY_DEFAULT)) {
+            // Coba baca sektor yang berisi saldo
+            val sector = 2 // Sektor 2 untuk E-Money
+            val block = mifare.sectorToBlock(sector) // Blok pertama di sektor 2
+            
+            if (mifare.authenticateSectorWithKeyA(sector, keyA)) {
                 val data = mifare.readBlock(block)
                 Log.d(TAG, "Data blok $block: ${bytesToHex(data)}")
-                return parseBalance(data)
+                
+                // Parse saldo E-Money (4 byte, big endian)
+                val balance = data.take(4).fold(0L) { acc, byte ->
+                    (acc shl 8) or (byte.toLong() and 0xFF)
+                }
+                Log.d(TAG, "Saldo mentah: $balance")
+                return balance / 100.0 // Konversi ke format rupiah
             } else {
                 Log.e(TAG, "Autentikasi gagal untuk sektor $sector")
-                return null
             }
+            
+            return null
         } catch (e: Exception) {
             Log.e(TAG, "Error membaca saldo: ${e.message}")
             return null
@@ -66,21 +79,7 @@ class MifareReader : CardReader {
         return MifareClassic.get(tag) != null
     }
 
-    override fun getCardType(): CardType = CardType.MIFARE
-
-    private fun parseBalance(data: ByteArray): Double {
-        try {
-            // Ambil 4 byte pertama sebagai saldo
-            val balance = data.take(4).fold(0L) { acc, byte ->
-                (acc shl 8) or (byte.toLong() and 0xFF)
-            }
-            Log.d(TAG, "Saldo mentah: $balance")
-            return balance / 100.0 // Konversi ke format rupiah (2 desimal)
-        } catch (e: Exception) {
-            Log.e(TAG, "Error parsing saldo: ${e.message}")
-            return 0.0
-        }
-    }
+    override fun getCardType(): CardType = CardType.EMONEY
 
     private fun bytesToHex(bytes: ByteArray): String {
         return bytes.joinToString("") { "%02X".format(it) }

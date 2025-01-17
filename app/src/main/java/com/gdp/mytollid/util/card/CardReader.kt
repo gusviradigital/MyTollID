@@ -15,14 +15,18 @@ interface CardReader {
         private const val TAG = "CardReader"
         
         fun getReader(tag: Tag): CardReader {
-            val isoDep = IsoDep.get(tag) ?: run {
-                Log.d(TAG, "IsoDep tidak tersedia")
-                return DefaultReader()
+            // Cek apakah kartu mendukung IsoDep
+            val isoDep = IsoDep.get(tag)
+            
+            // Jika tidak mendukung IsoDep, gunakan MifareClassic
+            if (isoDep == null) {
+                Log.d(TAG, "IsoDep tidak tersedia, mencoba MifareClassic")
+                return EMoneyReader() // Karena kita tahu ini E-Money
             }
             
             val atr = isoDep.historicalBytes ?: run {
-                Log.d(TAG, "Historical bytes tidak tersedia")
-                return DefaultReader()
+                Log.d(TAG, "Historical bytes tidak tersedia, mencoba MifareClassic")
+                return EMoneyReader() // Karena kita tahu ini E-Money
             }
             
             Log.d(TAG, "ATR: ${bytesToHex(atr)}")
@@ -36,7 +40,6 @@ interface CardReader {
                 CardType.BRIZZI -> BrizziReader()
                 CardType.TAPCASH -> TapCashReader()
                 CardType.JAKCARD -> JakCardReader()
-                CardType.MIFARE -> MifareReader()
                 CardType.UNKNOWN -> DefaultReader()
             }
         }
