@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/nav_graph"
+    app:startDestination="@id/navigation_scan">
+
+    <fragment
+        android:id="@+id/navigation_scan"
+        android:name="com.gdp.mytollid.ui.scan.ScanFragment"
+        android:label="Scan Kartu">
+    </fragment>
+
+    <fragment
+        android:id="@+id/navigation_manual"
+        android:name="com.gdp.mytollid.ui.manual.ManualInputFragment"
+        android:label="Input Manual">
+    </fragment>
+
+    <fragment
+        android:id="@+id/navigation_history"
+        android:name="com.gdp.mytollid.ui.history.HistoryFragment"
+        android:label="Riwayat">
+    </fragment>
+
+    <fragment
+        android:id="@+id/navigation_settings"
+        android:name="com.gdp.mytollid.ui.settings.SettingsFragment"
+        android:label="Pengaturan">
+    </fragment>
+
+</navigation> 
