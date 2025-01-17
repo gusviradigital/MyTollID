@@ -15,12 +15,17 @@ import com.gdp.mytollid.data.entity.CardCategory
 import com.gdp.mytollid.databinding.DialogEditCardBinding
 import com.gdp.mytollid.databinding.FragmentCardsBinding
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import java.text.NumberFormat
+import java.text.SimpleDateFormat
+import java.util.Locale
 
 class CardsFragment : Fragment() {
     private var _binding: FragmentCardsBinding? = null
     private val binding get() = _binding!!
     private lateinit var viewModel: CardsViewModel
     private lateinit var adapter: CardAdapter
+    private val numberFormat = NumberFormat.getCurrencyInstance(Locale("id", "ID"))
+    private val dateFormat = SimpleDateFormat("dd MMM yyyy HH:mm", Locale("id"))
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -43,7 +48,7 @@ class CardsFragment : Fragment() {
     private fun setupRecyclerView() {
         adapter = CardAdapter(
             onCardClick = { card ->
-                // TODO: Navigate to card detail
+                showCardDetail(card)
             },
             onEditClick = { card ->
                 showEditDialog(card)
@@ -136,6 +141,43 @@ class CardsFragment : Fragment() {
         }
 
         dialog.show()
+    }
+
+    private fun showCardDetail(card: Card) {
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle("Detail Kartu")
+            .setMessage("""
+                Nomor Kartu: ${formatCardNumber(card.cardNumber)}
+                Nama: ${if (card.cardAlias.isNotEmpty()) card.cardAlias else card.cardName}
+                Tipe: ${card.cardName}
+                Saldo: ${numberFormat.format(card.balance)}
+                Kategori: ${card.category.name}
+                Terakhir Cek: ${dateFormat.format(card.lastCheck)}
+                ${if (card.notes.isNotEmpty()) "\nCatatan:\n${card.notes}" else ""}
+            """.trimIndent())
+            .setPositiveButton("Edit") { _, _ ->
+                showEditDialog(card)
+            }
+            .setNegativeButton("Tutup", null)
+            .setNeutralButton("Hapus") { _, _ ->
+                showDeleteConfirmation(card)
+            }
+            .show()
+    }
+
+    private fun showDeleteConfirmation(card: Card) {
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle("Hapus Kartu")
+            .setMessage("Apakah Anda yakin ingin menghapus kartu ini?")
+            .setPositiveButton("Hapus") { _, _ ->
+                viewModel.deleteCard(card)
+            }
+            .setNegativeButton("Batal", null)
+            .show()
+    }
+
+    private fun formatCardNumber(cardNumber: String): String {
+        return cardNumber.chunked(4).joinToString(" ")
     }
 
     override fun onDestroyView() {

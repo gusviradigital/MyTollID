@@ -4,21 +4,60 @@ import android.nfc.Tag
 import android.nfc.tech.IsoDep
 import android.nfc.tech.MifareClassic
 import android.nfc.tech.NfcA
+import android.util.Log
 import java.io.IOException
 
 class DefaultReader : CardReader {
-    override fun readCardNumber(tag: Tag): String? {
-        // Coba baca dengan berbagai metode
-        val isoDep = IsoDep.get(tag)
-        val mifareClassic = MifareClassic.get(tag)
-        val nfcA = NfcA.get(tag)
+    private var cardType: CardType = CardType.UNKNOWN
+    private val TAG = "DefaultReader"
 
-        return when {
-            isoDep != null -> readWithIsoDep(isoDep)
-            mifareClassic != null -> readWithMifare(mifareClassic)
-            nfcA != null -> readWithNfcA(nfcA)
-            else -> null
+    override fun readCardNumber(tag: Tag): String? {
+        val isoDep = IsoDep.get(tag)
+        if (isoDep != null) {
+            try {
+                isoDep.connect()
+                isoDep.timeout = CardReader.DEFAULT_TIMEOUT
+
+                // Command untuk membaca nomor kartu
+                val command = byteArrayOf(
+                    0x90.toByte(), // CLA
+                    0x4C.toByte(), // INS
+                    0x00.toByte(), // P1
+                    0x00.toByte(), // P2
+                    0x08.toByte()  // Le
+                )
+                
+                Log.d(TAG, "Mengirim command APDU: ${bytesToHex(command)}")
+                val response = isoDep.transceive(command)
+                Log.d(TAG, "Response APDU: ${bytesToHex(response)}")
+
+                return parseCardNumber(response)
+            } catch (e: Exception) {
+                Log.e(TAG, "Error membaca nomor kartu: ${e.message}")
+            } finally {
+                try {
+                    isoDep.close()
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error menutup koneksi: ${e.message}")
+                }
+            }
         }
+        return null
+    }
+
+    private fun parseCardNumber(response: ByteArray): String? {
+        return try {
+            val cardNumber = response.take(8).joinToString("") { "%02d".format(it.toInt() and 0xFF) }
+            Log.d(TAG, "Nomor kartu: $cardNumber")
+            cardNumber
+        } catch (e: Exception) {
+            Log.e(TAG, "Error parsing nomor kartu: ${e.message}")
+            null
+        }
+    }
+
+    private fun bytesToHex(bytes: ByteArray): String {
+        return bytes.joinToString("") { "%02X".format(it) }
     }
 
     override fun readBalance(tag: Tag): Double? {

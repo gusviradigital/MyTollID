@@ -6,6 +6,7 @@ enum class CardType(val displayName: String) {
     BRIZZI("Brizzi BRI"),
     TAPCASH("TapCash BNI"),
     JAKCARD("JakCard Bank DKI"),
+    MIFARE("MIFARE Plus"),
     UNKNOWN("Kartu Tidak Dikenal");
 
     companion object {
@@ -22,8 +23,14 @@ enum class CardType(val displayName: String) {
                 atr.contentEquals(byteArrayOf(0x3B, 0x67, 0x00, 0x00, 0x00, 0x74, 0x61, 0x70, 0x63)) -> TAPCASH
                 // JakCard pattern
                 atr.contentEquals(byteArrayOf(0x3B, 0x67, 0x00, 0x00, 0x00, 0x6A, 0x61, 0x6B, 0x63)) -> JAKCARD
+                // MIFARE Plus pattern
+                bytesToHex(atr) == "4D49464152452B" -> MIFARE
                 else -> UNKNOWN
             }
+        }
+
+        private fun bytesToHex(bytes: ByteArray): String {
+            return bytes.joinToString("") { "%02X".format(it) }
         }
     }
 } 
