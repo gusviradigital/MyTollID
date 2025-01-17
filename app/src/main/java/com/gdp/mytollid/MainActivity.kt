@@ -4,6 +4,7 @@ import android.app.PendingIntent
 import android.content.Intent
 import android.nfc.NfcAdapter
 import android.nfc.Tag
+import android.os.Build
 import android.os.Bundle
 import android.view.View
 import android.widget.Toast
@@ -53,18 +54,14 @@ class MainActivity : AppCompatActivity() {
             Intent(this, javaClass).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
         )
-    }
 
-    private fun setupAds() {
-        settingsViewModel.isPremium.observe(this) { isPremium ->
-            binding.adView.visibility = if (isPremium) View.GONE else View.VISIBLE
-            if (!isPremium) {
-                loadBannerAd()
-            }
+        // Handle NFC intent if activity was started from NFC
+        if (intent != null) {
+            onNewIntent(intent)
         }
     }
 
-    private fun loadBannerAd() {
+    private fun setupAds() {
         val adRequest = AdRequest.Builder().build()
         binding.adView.loadAd(adRequest)
     }
@@ -79,34 +76,49 @@ class MainActivity : AppCompatActivity() {
         nfcAdapter?.disableForegroundDispatch(this)
     }
 
-    override fun onNewIntent(intent: Intent) {
+    override fun onNewIntent(intent: Intent?) {
         super.onNewIntent(intent)
-        if (NfcAdapter.ACTION_TECH_DISCOVERED == intent.action) {
-            val tag: Tag? = intent.getParcelableExtra(NfcAdapter.EXTRA_TAG)
-            tag?.let { processTag(it) }
+        
+        if (intent?.action == NfcAdapter.ACTION_TECH_DISCOVERED ||
+            intent?.action == NfcAdapter.ACTION_TAG_DISCOVERED) {
+            
+            val tag: Tag? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                intent.getParcelableExtra(NfcAdapter.EXTRA_TAG, Tag::class.java)
+            } else {
+                @Suppress("DEPRECATION")
+                intent.getParcelableExtra(NfcAdapter.EXTRA_TAG)
+            }
+
+            if (tag != null) {
+                processTag(tag)
+            }
         }
     }
 
     private fun processTag(tag: Tag) {
-        if (NfcUtils.isEMoneyCard(tag)) {
-            val cardNumber = NfcUtils.readCardNumber(tag)
-            val balance = NfcUtils.readBalance(tag)
+        if (!NfcUtils.isEMoneyCard(tag)) {
+            Toast.makeText(this, "Kartu tidak didukung", Toast.LENGTH_SHORT).show()
+            return
+        }
 
-            if (cardNumber != null && balance != null) {
-                val currentFragment = navHostFragment?.childFragmentManager?.fragments?.firstOrNull()
-                if (currentFragment is ScanFragment) {
-                    currentFragment.onCardScanned(cardNumber, balance)
-                } else {
-                    navHostFragment?.navController?.navigate(
-                        R.id.navigation_scan,
-                        Bundle().apply {
-                            putString("cardNumber", cardNumber)
-                            putDouble("balance", balance)
-                        }
-                    )
-                }
+        val cardNumber = NfcUtils.readCardNumber(tag)
+        val balance = NfcUtils.readBalance(tag)
+        val cardType = NfcUtils.getCardType(tag)
+
+        if (cardNumber != null && balance != null) {
+            val currentFragment = navHostFragment?.childFragmentManager?.fragments?.firstOrNull()
+            
+            if (currentFragment is ScanFragment) {
+                // Jika ScanFragment aktif, langsung kirim data
+                currentFragment.onCardScanned(cardNumber, balance, cardType)
             } else {
-                Toast.makeText(this, "Gagal membaca data kartu", Toast.LENGTH_SHORT).show()
+                // Jika tidak, navigasi ke ScanFragment dengan data
+                val bundle = Bundle().apply {
+                    putString("cardNumber", cardNumber)
+                    putDouble("balance", balance)
+                    putString("cardType", cardType.name)
+                }
+                navHostFragment?.navController?.navigate(R.id.navigation_scan, bundle)
             }
         } else {
             Toast.makeText(this, "Gagal membaca kartu", Toast.LENGTH_SHORT).show()

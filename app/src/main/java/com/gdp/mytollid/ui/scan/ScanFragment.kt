@@ -9,6 +9,7 @@ import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.ViewModelProvider
 import com.gdp.mytollid.databinding.FragmentScanBinding
+import com.gdp.mytollid.util.card.CardType
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -40,8 +41,10 @@ class ScanFragment : Fragment() {
         arguments?.let {
             val cardNumber = it.getString("cardNumber")
             val balance = it.getDouble("balance")
+            val cardTypeName = it.getString("cardType")
             if (cardNumber != null) {
-                onCardScanned(cardNumber, balance)
+                val cardType = cardTypeName?.let { name -> CardType.valueOf(name) } ?: CardType.UNKNOWN
+                onCardScanned(cardNumber, balance, cardType)
             }
         }
     }
@@ -49,6 +52,7 @@ class ScanFragment : Fragment() {
     private fun setupViews() {
         binding.textBalance.text = numberFormat.format(0)
         binding.textLastCheck.text = "Terakhir cek: -"
+        binding.textCardType.text = "Tipe kartu: -"
     }
 
     private fun observeViewModel() {
@@ -57,6 +61,7 @@ class ScanFragment : Fragment() {
                 is ScanResult.Success -> {
                     binding.textBalance.text = numberFormat.format(result.card.balance)
                     binding.textLastCheck.text = "Terakhir cek: ${dateFormat.format(result.card.lastCheck)}"
+                    binding.textCardType.text = "Tipe kartu: ${result.cardType.displayName}"
                 }
                 is ScanResult.Error -> {
                     Toast.makeText(context, result.message, Toast.LENGTH_SHORT).show()
@@ -65,8 +70,8 @@ class ScanFragment : Fragment() {
         }
     }
 
-    fun onCardScanned(cardNumber: String, balance: Double) {
-        viewModel.processNfcCard(cardNumber, balance)
+    fun onCardScanned(cardNumber: String, balance: Double, cardType: CardType) {
+        viewModel.processNfcCard(cardNumber, balance, cardType)
     }
 
     override fun onDestroyView() {

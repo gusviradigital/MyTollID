@@ -10,4 +10,13 @@
         <item>Informasi Lokasi</item>
         <item>Kalkulator Tarif Tol</item>
     </string>
+    <string name="admob_app_id">ca-app-pub-4142235126823424~6888888888</string>
+    <string name="admob_banner_id">ca-app-pub-4142235126823424/5956867864</string>
+    <string name="admob_interstitial_id">ca-app-pub-4142235126823424/5956867864</string>
+    <string name="admob_rewarded_id">ca-app-pub-4142235126823424/5956867864</string>
+    <string name="premium_product_id">premium_product_id</string>
+    <string name="premium_product_price">Rp. 50.000</string>
+    <string name="premium_product_title">MyToll ID Premium</string>
+    <string name="premium_product_description">Dapatkan akses ke semua fitur premium MyToll ID.</string>
+    <string name="premium_product_price_id">premium_product_price_id</string>
 </resources>

@@ -79,10 +79,18 @@
                 android:textStyle="bold" />
 
             <TextView
-                android:id="@+id/text_last_check"
+                android:id="@+id/text_card_type"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
+                android:text="Tipe kartu: -"
+                android:textSize="14sp" />
+
+            <TextView
+                android:id="@+id/text_last_check"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
                 android:text="Terakhir cek: -"
                 android:textSize="12sp" />
 

@@ -1,7 +1,7 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.jetbrains.kotlin.android)
-    id("com.google.devtools.ksp")
+    id("com.google.devtools.ksp") version "1.9.21-1.0.15"
 }
 
 android {
@@ -72,6 +72,9 @@ dependencies {
     
     // AdMob
     implementation("com.google.android.gms:play-services-ads:22.6.0")
+    
+    // Google Play Billing
+    implementation("com.android.billingclient:billing-ktx:6.1.0")
     
     // Testing
     testImplementation("junit:junit:4.13.2")
