@@ -5,24 +5,34 @@ import android.content.Intent
 import android.nfc.NfcAdapter
 import android.nfc.Tag
 import android.os.Bundle
+import android.view.View
 import android.widget.Toast
+import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.navigation.fragment.NavHostFragment
 import androidx.navigation.ui.setupWithNavController
 import com.gdp.mytollid.databinding.ActivityMainBinding
 import com.gdp.mytollid.ui.scan.ScanFragment
+import com.gdp.mytollid.ui.settings.SettingsViewModel
 import com.gdp.mytollid.util.NfcUtils
+import com.google.android.gms.ads.AdRequest
+import com.google.android.gms.ads.MobileAds
 
 class MainActivity : AppCompatActivity() {
     private var nfcAdapter: NfcAdapter? = null
     private var pendingIntent: PendingIntent? = null
     private lateinit var binding: ActivityMainBinding
     private var navHostFragment: NavHostFragment? = null
+    private val settingsViewModel: SettingsViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
+
+        // Initialize MobileAds
+        MobileAds.initialize(this)
+        setupAds()
 
         // Setup Navigation
         navHostFragment = supportFragmentManager
@@ -45,6 +55,20 @@ class MainActivity : AppCompatActivity() {
         )
     }
 
+    private fun setupAds() {
+        settingsViewModel.isPremium.observe(this) { isPremium ->
+            binding.adView.visibility = if (isPremium) View.GONE else View.VISIBLE
+            if (!isPremium) {
+                loadBannerAd()
+            }
+        }
+    }
+
+    private fun loadBannerAd() {
+        val adRequest = AdRequest.Builder().build()
+        binding.adView.loadAd(adRequest)
+    }
+
     override fun onResume() {
         super.onResume()
         nfcAdapter?.enableForegroundDispatch(this, pendingIntent, null, null)
@@ -64,28 +88,25 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun processTag(tag: Tag) {
-        if (!NfcUtils.isEMoneyCard(tag)) {
-            Toast.makeText(this, "Bukan kartu E-Money yang valid", Toast.LENGTH_SHORT).show()
-            return
-        }
+        if (NfcUtils.isEMoneyCard(tag)) {
+            val cardNumber = NfcUtils.readCardNumber(tag)
+            val balance = NfcUtils.readBalance(tag)
 
-        val cardNumber = NfcUtils.readCardNumber(tag)
-        val balance = NfcUtils.readBalance(tag)
-
-        if (cardNumber != null && balance != null) {
-            // Kirim data ke ScanFragment jika sedang aktif
-            val currentFragment = navHostFragment?.childFragmentManager?.fragments?.firstOrNull()
-            if (currentFragment is ScanFragment) {
-                currentFragment.onCardScanned(cardNumber, balance)
+            if (cardNumber != null && balance != null) {
+                val currentFragment = navHostFragment?.childFragmentManager?.fragments?.firstOrNull()
+                if (currentFragment is ScanFragment) {
+                    currentFragment.onCardScanned(cardNumber, balance)
+                } else {
+                    navHostFragment?.navController?.navigate(
+                        R.id.navigation_scan,
+                        Bundle().apply {
+                            putString("cardNumber", cardNumber)
+                            putDouble("balance", balance)
+                        }
+                    )
+                }
             } else {
-                // Jika tidak di ScanFragment, navigasi ke sana dengan data
-                navHostFragment?.navController?.navigate(
-                    R.id.navigation_scan,
-                    Bundle().apply {
-                        putString("cardNumber", cardNumber)
-                        putDouble("balance", balance)
-                    }
-                )
+                Toast.makeText(this, "Gagal membaca data kartu", Toast.LENGTH_SHORT).show()
             }
         } else {
             Toast.makeText(this, "Gagal membaca kartu", Toast.LENGTH_SHORT).show()
