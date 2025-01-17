@@ -1,0 +1,13 @@
+<resources>
+    <string name="app_name">MyToll ID</string>
+    <string name="app_name_tagline">Your Smart Toll Card Companion</string>
+    <string name="app_description">Kelola e-toll dengan mudah. Cek saldo, lacak transaksi, dan temukan lokasi top up terdekat.</string>
+    <string name="app_description_long">MyToll ID adalah solusi lengkap untuk manajemen kartu e-toll Anda. Aplikasi ini dirancang untuk memudahkan pengguna jalan tol dalam mengelola dan memantau kartu e-toll mereka dengan fitur-fitur yang intuitif dan bermanfaat.</string>
+    <string name="app_features">Fitur Utama</string>
+    <string name="app_features_description">
+        <item>Cek Saldo Instan</item>
+        <item>Manajemen Kartu Pintar</item>
+        <item>Informasi Lokasi</item>
+        <item>Kalkulator Tarif Tol</item>
+    </string>
+</resources>
