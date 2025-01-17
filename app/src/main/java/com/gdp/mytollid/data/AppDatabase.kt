@@ -5,24 +5,21 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
-import com.gdp.mytollid.data.converter.CardCategoryConverter
+import com.gdp.mytollid.data.converter.Converters
 import com.gdp.mytollid.data.dao.CardDao
-import com.gdp.mytollid.data.dao.TollGateDao
 import com.gdp.mytollid.data.dao.TransactionDao
 import com.gdp.mytollid.data.entity.Card
-import com.gdp.mytollid.data.entity.TollGate
 import com.gdp.mytollid.data.entity.Transaction
 
 @Database(
-    entities = [Card::class, Transaction::class, TollGate::class],
-    version = 4,
+    entities = [Card::class, Transaction::class],
+    version = 3,
     exportSchema = false
 )
-@TypeConverters(CardCategoryConverter::class)
+@TypeConverters(Converters::class)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun cardDao(): CardDao
     abstract fun transactionDao(): TransactionDao
-    abstract fun tollGateDao(): TollGateDao
 
     companion object {
         @Volatile
@@ -33,7 +30,7 @@ abstract class AppDatabase : RoomDatabase() {
                 val instance = Room.databaseBuilder(
                     context.applicationContext,
                     AppDatabase::class.java,
-                    "mytollid_database"
+                    "mytoll_database"
                 )
                     .fallbackToDestructiveMigration()
                     .build()
