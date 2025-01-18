@@ -10,22 +10,22 @@ class EMoneyReader : CardReader {
     private val TAG = "EMoneyReader"
 
     override fun readCardNumber(tag: Tag): String? {
-        // Coba baca dengan MifareClassic dulu
+        // Coba baca dengan MifareClassic
         val mifare = MifareClassic.get(tag)
         if (mifare != null) {
             try {
                 mifare.connect()
                 val uid = mifare.tag.id
                 val uidHex = bytesToHex(uid)
-                Log.d(TAG, "UID kartu (MifareClassic): $uidHex (${uid.size} bytes)")
+                Log.d(TAG, "UID kartu: $uidHex (${uid.size} bytes)")
                 return uidHex
             } catch (e: Exception) {
-                Log.e(TAG, "Error membaca UID dengan MifareClassic: ${e.message}")
+                Log.e(TAG, "Error membaca UID: ${e.message}")
             } finally {
                 try {
                     mifare.close()
                 } catch (e: Exception) {
-                    Log.e(TAG, "Error menutup koneksi MifareClassic: ${e.message}")
+                    Log.e(TAG, "Error menutup koneksi: ${e.message}")
                 }
             }
         }
@@ -59,129 +59,72 @@ class EMoneyReader : CardReader {
     }
 
     override fun readBalance(tag: Tag): Double? {
-        // Coba baca dengan MifareClassic dulu
+        // Coba baca dengan MifareClassic
         val mifare = MifareClassic.get(tag)
         if (mifare != null) {
             try {
                 mifare.connect()
                 
-                // Daftar key yang umum digunakan
+                // Key untuk E-Money
                 val keys = listOf(
-                    // Key A standar untuk E-Money
-                    byteArrayOf(0xA0.toByte(), 0xA1.toByte(), 0xA2.toByte(), 0xA3.toByte(), 0xA4.toByte(), 0xA5.toByte()),
-                    // Key B standar untuk E-Money
-                    byteArrayOf(0xB0.toByte(), 0xB1.toByte(), 0xB2.toByte(), 0xB3.toByte(), 0xB4.toByte(), 0xB5.toByte()),
-                    // Key default MIFARE
+                    // Default factory key
+                    byteArrayOf(0xFF.toByte(), 0xFF.toByte(), 0xFF.toByte(), 0xFF.toByte(), 0xFF.toByte(), 0xFF.toByte()),
+                    // Default MIFARE key
                     MifareClassic.KEY_DEFAULT,
-                    // Key factory default
-                    byteArrayOf(0xFF.toByte(), 0xFF.toByte(), 0xFF.toByte(), 0xFF.toByte(), 0xFF.toByte(), 0xFF.toByte())
+                    // E-Money key A
+                    byteArrayOf(0xA0.toByte(), 0xA1.toByte(), 0xA2.toByte(), 0xA3.toByte(), 0xA4.toByte(), 0xA5.toByte()),
+                    // E-Money key B
+                    byteArrayOf(0xB0.toByte(), 0xB1.toByte(), 0xB2.toByte(), 0xB3.toByte(), 0xB4.toByte(), 0xB5.toByte())
                 )
                 
-                // Coba beberapa sektor yang mungkin berisi saldo
-                val sectors = listOf(1, 2, 3, 4, 8)
+                // Coba baca sektor yang berisi saldo
+                val sectors = listOf(1, 2, 3, 4)
                 
                 for (sector in sectors) {
                     for (key in keys) {
                         try {
-                            // Coba autentikasi dengan Key A
                             if (mifare.authenticateSectorWithKeyA(sector, key)) {
-                                val block = mifare.sectorToBlock(sector)
-                                val data = mifare.readBlock(block)
-                                Log.d(TAG, "Data sektor $sector blok $block dengan Key A: ${bytesToHex(data)}")
+                                val firstBlock = mifare.sectorToBlock(sector)
+                                val lastBlock = firstBlock + mifare.getBlockCountInSector(sector) - 1
                                 
-                                // Coba parse saldo dengan beberapa format
-                                val balance = try {
-                                    // Format 1: 4 byte big endian
-                                    val bal1 = data.take(4).fold(0L) { acc, byte ->
-                                        (acc shl 8) or (byte.toLong() and 0xFF)
+                                // Baca semua blok dalam sektor
+                                for (block in firstBlock..lastBlock) {
+                                    try {
+                                        val data = mifare.readBlock(block)
+                                        Log.d(TAG, "Data sektor $sector blok $block: ${bytesToHex(data)}")
+                                        
+                                        // Coba parse saldo
+                                        val balance = try {
+                                            val value = data.take(4).fold(0L) { acc, byte ->
+                                                (acc shl 8) or (byte.toLong() and 0xFF)
+                                            }
+                                            if (value in 1000..1000000) value else null
+                                        } catch (e: Exception) {
+                                            null
+                                        }
+                                        
+                                        if (balance != null) {
+                                            return balance / 100.0
+                                        }
+                                    } catch (e: Exception) {
+                                        Log.d(TAG, "Gagal membaca blok $block: ${e.message}")
+                                        continue
                                     }
-                                    Log.d(TAG, "Saldo format 1: $bal1")
-                                    
-                                    // Format 2: 4 byte little endian
-                                    val bal2 = data.take(4).reversed().fold(0L) { acc, byte ->
-                                        (acc shl 8) or (byte.toLong() and 0xFF)
-                                    }
-                                    Log.d(TAG, "Saldo format 2: $bal2")
-                                    
-                                    // Format 3: BCD format (2 byte)
-                                    val bcdString = data.take(2).joinToString("") { byte ->
-                                        String.format("%02X", byte)
-                                    }
-                                    val bal3 = bcdString.toLongOrNull() ?: 0L
-                                    Log.d(TAG, "Saldo format 3: $bal3")
-                                    
-                                    // Pilih saldo yang masuk akal (antara 1000 dan 1000000)
-                                    when {
-                                        bal1 in 1000..1000000 -> bal1
-                                        bal2 in 1000..1000000 -> bal2
-                                        bal3 in 1000..1000000 -> bal3
-                                        else -> null
-                                    }
-                                } catch (e: Exception) {
-                                    null
-                                }
-                                
-                                if (balance != null) {
-                                    return balance / 100.0
-                                }
-                            }
-                            
-                            // Coba autentikasi dengan Key B
-                            if (mifare.authenticateSectorWithKeyB(sector, key)) {
-                                val block = mifare.sectorToBlock(sector)
-                                val data = mifare.readBlock(block)
-                                Log.d(TAG, "Data sektor $sector blok $block dengan Key B: ${bytesToHex(data)}")
-                                
-                                // Coba parse saldo dengan beberapa format
-                                val balance = try {
-                                    // Format 1: 4 byte big endian
-                                    val bal1 = data.take(4).fold(0L) { acc, byte ->
-                                        (acc shl 8) or (byte.toLong() and 0xFF)
-                                    }
-                                    Log.d(TAG, "Saldo format 1: $bal1")
-                                    
-                                    // Format 2: 4 byte little endian
-                                    val bal2 = data.take(4).reversed().fold(0L) { acc, byte ->
-                                        (acc shl 8) or (byte.toLong() and 0xFF)
-                                    }
-                                    Log.d(TAG, "Saldo format 2: $bal2")
-                                    
-                                    // Format 3: BCD format (2 byte)
-                                    val bcdString = data.take(2).joinToString("") { byte ->
-                                        String.format("%02X", byte)
-                                    }
-                                    val bal3 = bcdString.toLongOrNull() ?: 0L
-                                    Log.d(TAG, "Saldo format 3: $bal3")
-                                    
-                                    // Pilih saldo yang masuk akal (antara 1000 dan 1000000)
-                                    when {
-                                        bal1 in 1000..1000000 -> bal1
-                                        bal2 in 1000..1000000 -> bal2
-                                        bal3 in 1000..1000000 -> bal3
-                                        else -> null
-                                    }
-                                } catch (e: Exception) {
-                                    null
-                                }
-                                
-                                if (balance != null) {
-                                    return balance / 100.0
                                 }
                             }
                         } catch (e: Exception) {
-                            Log.d(TAG, "Gagal membaca sektor $sector: ${e.message}")
+                            Log.d(TAG, "Gagal autentikasi sektor $sector: ${e.message}")
                             continue
                         }
                     }
                 }
-                Log.e(TAG, "Tidak dapat menemukan saldo yang valid di semua sektor")
             } catch (e: Exception) {
-                Log.e(TAG, "Error membaca saldo dengan MifareClassic: ${e.message}")
+                Log.e(TAG, "Error membaca saldo: ${e.message}")
             } finally {
                 try {
                     mifare.close()
                 } catch (e: Exception) {
-                    Log.e(TAG, "Error menutup koneksi MifareClassic: ${e.message}")
+                    Log.e(TAG, "Error menutup koneksi: ${e.message}")
                 }
             }
         }
@@ -192,31 +135,19 @@ class EMoneyReader : CardReader {
             isoDep.connect()
             isoDep.timeout = CardReader.DEFAULT_TIMEOUT
 
-            // Command APDU untuk membaca saldo E-Money
-            val commands = listOf(
-                // Command 1: Standard
-                byteArrayOf(0x90.toByte(), 0x5C.toByte(), 0x00.toByte(), 0x00.toByte(), 0x04.toByte()),
-                // Command 2: Get Balance
-                byteArrayOf(0x80.toByte(), 0x5C.toByte(), 0x00.toByte(), 0x00.toByte(), 0x04.toByte()),
-                // Command 3: Read Record
-                byteArrayOf(0x00.toByte(), 0xB2.toByte(), 0x01.toByte(), 0x0C.toByte(), 0x00.toByte())
+            val command = byteArrayOf(
+                0x90.toByte(), // CLA
+                0x5C.toByte(), // INS
+                0x00.toByte(), // P1
+                0x00.toByte(), // P2
+                0x04.toByte()  // Le
             )
 
-            for (command in commands) {
-                try {
-                    Log.d(TAG, "Mencoba command APDU: ${bytesToHex(command)}")
-                    val response = isoDep.transceive(command)
-                    Log.d(TAG, "Response APDU: ${bytesToHex(response)}")
-                    
-                    if (response.size >= 4) {
-                        val balance = parseBalance(response)
-                        if (balance > 10.0 && balance < 10000.0) { // Validasi saldo masuk akal
-                            return balance
-                        }
-                    }
-                } catch (e: Exception) {
-                    Log.d(TAG, "Command gagal: ${e.message}")
-                    continue
+            val response = isoDep.transceive(command)
+            if (response.size >= 4) {
+                val balance = parseBalance(response)
+                if (balance > 10.0 && balance < 10000.0) {
+                    return balance
                 }
             }
             return null
@@ -233,7 +164,7 @@ class EMoneyReader : CardReader {
     }
 
     override fun isCardSupported(tag: Tag): Boolean {
-        return IsoDep.get(tag) != null || MifareClassic.get(tag) != null
+        return MifareClassic.get(tag) != null || IsoDep.get(tag) != null
     }
 
     override fun getCardType(): CardType = CardType.EMONEY
@@ -249,12 +180,11 @@ class EMoneyReader : CardReader {
 
     private fun parseBalance(data: ByteArray): Double {
         try {
-            // Parse saldo (4 byte, big endian)
             val balance = data.take(4).fold(0L) { acc, byte ->
                 (acc shl 8) or (byte.toLong() and 0xFF)
             }
             Log.d(TAG, "Saldo mentah: $balance")
-            return balance / 100.0 // Konversi ke format rupiah
+            return balance / 100.0
         } catch (e: Exception) {
             Log.e(TAG, "Error parsing saldo: ${e.message}")
             return 0.0
